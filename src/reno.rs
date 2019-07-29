@@ -55,15 +55,23 @@ impl GenericCongAvoidFlow for Reno {
         }
     }
 
+    fn adjust_cwnd(&mut self,
+                   network_status: &NetworkStatus,
+                   m: &GenericCongAvoidMeasurements
+    ) {
+        if network_status.link_utilization > 0.9 {
+            println!("Link get full utilized. Stop increasing cwnd.");
+            return
+        }
+        // increase cwnd by 1 / cwnd per packet
+        println!("Link underutilized. Increase cwnd by 1 / cwnd per packet");
+        self.cwnd += f64::from(self.mss) * (f64::from(m.acked) / self.cwnd);
+    }
+
     fn update_network_status(&mut self) -> NetworkStatus {
         let request_url = format!("http://127.0.0.1:8080/get_link_utilization");
         let mut response = reqwest::get(&request_url).unwrap();
 
-        let network_status: Vec<NetworkStatus> = response.json().unwrap();
-        println!("{:?}", network_status);
-        NetworkStatus {
-            link_utilization: 0.0,
-            queue_length: 0,
-        }
+        response.json().unwrap()
     }
 }

@@ -54,6 +54,10 @@ pub trait GenericCongAvoidFlow {
     fn reduction(&mut self, m: &GenericCongAvoidMeasurements);
     fn reset(&mut self) {}
 
+    fn adjust_cwnd(&mut self,
+                   network_status: &NetworkStatus,
+                   m: &GenericCongAvoidMeasurements);
+
     fn update_network_status(&mut self) -> NetworkStatus;
 }
 
@@ -306,14 +310,13 @@ impl<I: Ipc, A: GenericCongAvoidFlow> portus::Flow for Flow<I, A> {
             return;
         }
 
-        ms.acked = self.slow_start_increase(ms.acked);
+        //ms.acked = self.slow_start_increase(ms.acked);
 
         if self.use_remote {
-            self.alg.update_network_status();
-        }
-
-        {
-
+            let network_status = self.alg.update_network_status();
+            println!("{:?}", &network_status);
+            self.alg.adjust_cwnd(&network_status, &ms);
+        } else {
             // increase the cwnd corresponding to new in-order cumulative ACKs
             self.alg.increase(&ms);
             self.maybe_reduce_cwnd(&ms);
@@ -323,7 +326,6 @@ impl<I: Ipc, A: GenericCongAvoidFlow> portus::Flow for Flow<I, A> {
                 });
                 return;
             }
-
         }
 
         self.update_cwnd();
