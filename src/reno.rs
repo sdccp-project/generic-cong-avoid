@@ -1,6 +1,9 @@
 extern crate slog;
 
-use GenericCongAvoidAlg;
+use serde_derive;
+use reqwest::Error;
+
+use ::{RemoteGenericCongAvoidAlg, NetworkStatus};
 use GenericCongAvoidFlow;
 use GenericCongAvoidMeasurements;
 
@@ -11,7 +14,7 @@ pub struct Reno {
     cwnd: f64,
 }
 
-impl GenericCongAvoidAlg for Reno {
+impl RemoteGenericCongAvoidAlg for Reno {
     type Flow = Self;
 
     fn name() -> &'static str {
@@ -49,6 +52,18 @@ impl GenericCongAvoidFlow for Reno {
         self.cwnd /= 2.0;
         if self.cwnd <= self.init_cwnd {
             self.cwnd = self.init_cwnd;
+        }
+    }
+
+    fn update_network_status(&mut self) -> NetworkStatus {
+        let request_url = format!("http://127.0.0.1:8080/get_link_utilization");
+        let mut response = reqwest::get(&request_url).unwrap();
+
+        let network_status: Vec<NetworkStatus> = response.json().unwrap();
+        println!("{:?}", network_status);
+        NetworkStatus {
+            link_utilization: 0.0,
+            queue_length: 0,
         }
     }
 }

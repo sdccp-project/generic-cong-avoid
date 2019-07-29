@@ -6,11 +6,11 @@ use slog;
 use std;
 use time;
 use {
-    Alg, GenericCongAvoidAlg, GenericCongAvoidConfigReport,
+    Alg, RemoteGenericCongAvoidAlg, GenericCongAvoidConfigReport,
     GenericCongAvoidConfigSS, DEFAULT_SS_THRESH,
 };
 
-pub fn make_args<A: GenericCongAvoidAlg>(
+pub fn make_args<A: RemoteGenericCongAvoidAlg>(
     name: &str,
     logger: impl Into<Option<slog::Logger>>,
 ) -> Result<(Alg<A>, String), std::num::ParseIntError> {
@@ -89,7 +89,7 @@ pub fn make_args<A: GenericCongAvoidAlg>(
     ))
 }
 
-pub fn start<A: GenericCongAvoidAlg>(ipc: &str, log: slog::Logger, alg: Alg<A>)
+pub fn start<A: RemoteGenericCongAvoidAlg>(ipc: &str, log: slog::Logger, alg: Alg<A>)
 where
     A: 'static,
 {

@@ -15,3 +15,6 @@ slog = {version = "2"}
 slog-async = "2"
 slog-term = "2"
 time = "0.1"
+reqwest = "0.9.19"
+serde_derive = "1.0.97"
+serde = "1.0.97"

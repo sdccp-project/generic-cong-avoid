@@ -3,19 +3,27 @@ extern crate time;
 #[macro_use]
 extern crate slog;
 extern crate portus;
+#[macro_use]
+extern crate serde_derive;
+extern crate reqwest;
 
 use std::collections::HashMap;
 use portus::ipc::Ipc;
 use portus::lang::Scope;
 use portus::{CongAlg, Datapath, DatapathInfo, DatapathTrait, Report};
 
-pub mod cubic;
 pub mod reno;
 
 mod bin_helper;
 pub use bin_helper::{make_args, start};
 
 pub const DEFAULT_SS_THRESH: u32 = 0x7fff_ffff;
+
+#[derive(Deserialize, Debug)]
+pub struct NetworkStatus {
+    pub link_utilization: f32,
+    pub queue_length: u32,
+}
 
 pub struct GenericCongAvoidMeasurements {
     pub acked: u32,
@@ -45,9 +53,11 @@ pub trait GenericCongAvoidFlow {
     fn increase(&mut self, m: &GenericCongAvoidMeasurements);
     fn reduction(&mut self, m: &GenericCongAvoidMeasurements);
     fn reset(&mut self) {}
+
+    fn update_network_status(&mut self) -> NetworkStatus;
 }
 
-pub trait GenericCongAvoidAlg {
+pub trait RemoteGenericCongAvoidAlg {
     type Flow: GenericCongAvoidFlow;
 
     fn name() -> &'static str;
@@ -58,7 +68,7 @@ pub trait GenericCongAvoidAlg {
     fn new_flow(&self, logger: Option<slog::Logger>, init_cwnd: u32, mss: u32) -> Self::Flow;
 }
 
-pub struct Alg<A: GenericCongAvoidAlg> {
+pub struct Alg<A: RemoteGenericCongAvoidAlg> {
     pub deficit_timeout: u32,
     pub init_cwnd: u32,
     pub report_option: GenericCongAvoidConfigReport,
@@ -69,7 +79,7 @@ pub struct Alg<A: GenericCongAvoidAlg> {
     pub alg: A,
 }
 
-impl<T: Ipc, A: GenericCongAvoidAlg> CongAlg<T> for Alg<A> {
+impl<T: Ipc, A: RemoteGenericCongAvoidAlg> CongAlg<T> for Alg<A> {
     type Flow = Flow<T, A::Flow>;
 
     fn name() -> &'static str {
@@ -223,6 +233,8 @@ impl<T: Ipc, A: GenericCongAvoidAlg> CongAlg<T> for Alg<A> {
             curr_cwnd_reduction: 0,
             last_cwnd_reduction: time::now().to_timespec() - time::Duration::milliseconds(500),
             alg: self.alg.new_flow(self.logger.clone(), init_cwnd, info.mss),
+
+            use_remote: true,
         };
 
         match (self.ss, self.report_option) {
@@ -262,6 +274,8 @@ pub struct Flow<T: Ipc, A: GenericCongAvoidFlow> {
     mss: u32,
     rtt: u32,
     sc: Scope,
+
+    use_remote: bool,
 }
 
 impl<I: Ipc, A: GenericCongAvoidFlow> portus::Flow for Flow<I, A> {
@@ -294,14 +308,22 @@ impl<I: Ipc, A: GenericCongAvoidFlow> portus::Flow for Flow<I, A> {
 
         ms.acked = self.slow_start_increase(ms.acked);
 
-        // increase the cwnd corresponding to new in-order cumulative ACKs
-        self.alg.increase(&ms);
-        self.maybe_reduce_cwnd(&ms);
-        if self.curr_cwnd_reduction > 0 {
-            self.logger.as_ref().map(|log| {
-                debug!(log, "in cwnd reduction"; "acked" => ms.acked / self.mss, "deficit" => self.curr_cwnd_reduction);
-            });
-            return;
+        if self.use_remote {
+            self.alg.update_network_status();
+        }
+
+        {
+
+            // increase the cwnd corresponding to new in-order cumulative ACKs
+            self.alg.increase(&ms);
+            self.maybe_reduce_cwnd(&ms);
+            if self.curr_cwnd_reduction > 0 {
+                self.logger.as_ref().map(|log| {
+                    debug!(log, "in cwnd reduction"; "acked" => ms.acked / self.mss, "deficit" => self.curr_cwnd_reduction);
+                });
+                return;
+            }
+
         }
 
         self.update_cwnd();
