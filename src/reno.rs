@@ -12,6 +12,8 @@ pub struct Reno {
     mss: u32,
     init_cwnd: f64,
     cwnd: f64,
+
+    last_utilization: f32,
 }
 
 impl RemoteGenericCongAvoidAlg for Reno {
@@ -30,6 +32,8 @@ impl RemoteGenericCongAvoidAlg for Reno {
             mss,
             init_cwnd: f64::from(init_cwnd),
             cwnd: f64::from(init_cwnd),
+
+            last_utilization: 0.0,
         }
     }
 }
@@ -57,15 +61,39 @@ impl GenericCongAvoidFlow for Reno {
 
     fn adjust_cwnd(&mut self,
                    network_status: &NetworkStatus,
-                   m: &GenericCongAvoidMeasurements
-    ) {
-        if network_status.link_utilization > 0.9 {
-            println!("Link get full utilized. Stop increasing cwnd.");
+                   m: &GenericCongAvoidMeasurements)
+    {
+        if network_status.queue_length > 10 {
+            println!("Link get full utilized. Decrease cwnd");
+            self.cwnd -= network_status.queue_length as f64 / 10.0;
             return
         }
+
+        if network_status.link_utilization == self.last_utilization {
+            println!("Link underutilized. Increase cwnd by 1 / cwnd per packet");
+            self.cwnd += f64::from(self.mss) * (f64::from(m.acked) / self.cwnd);
+            return
+        }
+
+        let mut link_uti = 1.0;
+        if network_status.link_utilization < 1.0 {
+            link_uti = network_status.link_utilization
+        }
+
+        self.cwnd *= 3.0 / (2.0 * link_uti as f64 + 1.0);
+        self.last_utilization = network_status.link_utilization;
+
+//        let link_uti = network_status.link_utilization * 10.0;
+//        let link_uti = link_uti as u32;
+//        let link_uti = link_uti as f64 / 10.0;
+//
+//        {
+//            self.cwnd /= link_uti;
+//            return
+//        }
         // increase cwnd by 1 / cwnd per packet
-        println!("Link underutilized. Increase cwnd by 1 / cwnd per packet");
-        self.cwnd += f64::from(self.mss) * (f64::from(m.acked) / self.cwnd);
+//        println!("Link underutilized. Increase cwnd by 1 / cwnd per packet");
+//        self.cwnd += f64::from(self.mss) * (f64::from(m.acked) / self.cwnd);
     }
 
     fn update_network_status(&mut self) -> NetworkStatus {
