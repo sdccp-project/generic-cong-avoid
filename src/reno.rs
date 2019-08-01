@@ -74,21 +74,29 @@ impl GenericCongAvoidFlow for Reno {
         if network_status.queue_length > 10 {
             println!("Link get full utilized. Decrease cwnd");
             self.cwnd -= f64::from(network_status.queue_length) * f64::from(self.mss);
+            if self.cwnd < f64::from(self.mss) {
+                self.cwnd = f64::from(self.mss);
+            }
             return
         }
 
-        if network_status.link_utilization == self.last_utilization {
-            self.cwnd += f64::from(self.mss) * (f64::from(m.acked) / self.cwnd);
-            return
-        }
+        let is_aggressive = false;
+        if is_aggressive {
+            if network_status.link_utilization == self.last_utilization {
+                self.cwnd += f64::from(self.mss) * (f64::from(m.acked) / self.cwnd);
+                return;
+            }
 
-        let mut link_uti = 1.0;
-        if network_status.link_utilization < 1.0 {
-            link_uti = network_status.link_utilization
-        }
+            let mut link_uti = 1.0;
+            if network_status.link_utilization < 1.0 {
+                link_uti = network_status.link_utilization
+            }
 
-        self.cwnd *= 3.0 / (2.0 * link_uti as f64 + 1.0);
-        self.last_utilization = network_status.link_utilization;
+            self.cwnd *= 3.0 / (2.0 * link_uti as f64 + 1.0);
+            self.last_utilization = network_status.link_utilization;
+        } else {
+            self.cwnd += 2.0 * f64::from(self.mss) * (f64::from(m.acked) / self.cwnd);
+        }
 
         write!(self.log_file.as_mut().unwrap(),
                "time: {:?}\tlink_utilization: {:.2}\tqueue: {}\tcwnd: {}\n",

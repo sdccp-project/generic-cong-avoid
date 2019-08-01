@@ -387,6 +387,20 @@ impl<T: Ipc, A: GenericCongAvoidFlow> Flow<T, A> {
                 );
             });
         }
+
+        let is_set_rate = false;
+        if is_set_rate {
+            if let Err(e) = self
+                .control_channel
+                .update_field(&self.sc, &[("Rate", 200000)])
+            {
+                self.logger.as_ref().map(|log| {
+                    warn!(log, "Cwnd update error";
+                      "err" => ?e,
+                );
+                });
+            }
+        }
     }
 
     fn get_fields(&mut self, m: &Report) -> GenericCongAvoidMeasurements {
