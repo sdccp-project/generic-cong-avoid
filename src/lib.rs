@@ -22,7 +22,7 @@ pub const DEFAULT_SS_THRESH: u32 = 0x7fff_ffff;
 #[derive(Deserialize, Debug)]
 pub struct NetworkStatus {
     pub link_utilization: f32,
-    pub queue_length: u32,
+    pub queue_length: i32,
 }
 
 pub struct GenericCongAvoidMeasurements {
