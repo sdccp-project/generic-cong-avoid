@@ -8,6 +8,7 @@ use std::io::{Write, BufReader, BufRead};
 use std::time::SystemTime;
 
 pub const LOG_OUTPUT_FILE: &str = "log_output.txt";
+pub const REST_ADDR: &str = "http://127.0.0.1:8080/get_link_utilization";
 
 use ::{RemoteGenericCongAvoidAlg, NetworkStatus};
 use GenericCongAvoidFlow;
@@ -105,8 +106,8 @@ impl GenericCongAvoidFlow for Reno {
     }
 
     fn update_network_status(&mut self) -> NetworkStatus {
-        let request_url = format!("http://127.0.0.1:8080/get_link_utilization");
-        let mut response = reqwest::get(&request_url).unwrap();
+        let request_url = REST_ADDR;
+        let mut response = reqwest::get(request_url).unwrap();
 
         response.json().unwrap()
     }
