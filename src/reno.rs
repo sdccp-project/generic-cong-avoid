@@ -115,15 +115,16 @@ impl GenericCongAvoidFlow for Reno {
         }
 
         let mut queue_packets :i32 = -1;
-        if network_status.queue_length > 0 {
+        if network_status.queue_length >= 0 {
             queue_packets = network_status.queue_length / self.mss as i32;
         }
         write!(self.log_file.as_mut().unwrap(),
-               "time: {:?}\tlink_utilization: {:.2}\tqueue: {}\tcwnd: {}\n",
+               "time: {:?}\tlink_utilization: {:.2}\tqueue: {}\tcwnd: {}\trtt: {}\n",
                SystemTime::now(),
                network_status.link_utilization,
                queue_packets,
-               self.cwnd as u32 / self.mss);
+               self.cwnd as u32 / self.mss,
+               m.rtt as f64 / 1000.0);
     }
 
     fn update_network_status(&mut self) -> NetworkStatus {
