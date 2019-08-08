@@ -102,18 +102,6 @@ impl GenericCongAvoidFlow for Reno {
                network_status.link_utilization,
                network_status.queue_length,
                self.cwnd as u32 / self.mss);
-
-//        let link_uti = network_status.link_utilization * 10.0;
-//        let link_uti = link_uti as u32;
-//        let link_uti = link_uti as f64 / 10.0;
-//
-//        {
-//            self.cwnd /= link_uti;
-//            return
-//        }
-        // increase cwnd by 1 / cwnd per packet
-//        println!("Link underutilized. Increase cwnd by 1 / cwnd per packet");
-//        self.cwnd += f64::from(self.mss) * (f64::from(m.acked) / self.cwnd);
     }
 
     fn update_network_status(&mut self) -> NetworkStatus {
