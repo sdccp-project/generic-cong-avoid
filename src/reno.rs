@@ -72,19 +72,23 @@ impl GenericCongAvoidFlow for Reno {
                    network_status: &NetworkStatus,
                    m: &GenericCongAvoidMeasurements)
     {
-        self.cwnd = 37.0 * self.mss as f64;
-        let mut queue_packets :i32 = -1;
-        if network_status.queue_length > 0 {
-            queue_packets = network_status.queue_length / self.mss as i32;
+        let fix_cwnd :Option<u32> = None;
+        if fix_cwnd.is_some() {
+            self.cwnd = fix_cwnd.unwrap() as f64 * self.mss as f64;
+            let mut queue_packets :i32 = -1;
+            if network_status.queue_length > 0 {
+                queue_packets = network_status.queue_length / self.mss as i32;
+            }
+            write!(self.log_file.as_mut().unwrap(),
+                   "time: {:?}\tlink_utilization: {:.2}\tqueue: {}\tcwnd: {}\trtt: {}\n",
+                   SystemTime::now(),
+                   network_status.link_utilization,
+                   queue_packets,
+                   self.cwnd as u32 / self.mss,
+                   m.rtt as f64 / 1000.0);
+            return;
         }
-        write!(self.log_file.as_mut().unwrap(),
-               "time: {:?}\tlink_utilization: {:.2}\tqueue: {}\tcwnd: {}\trtt: {}\n",
-               SystemTime::now(),
-               network_status.link_utilization,
-               queue_packets,
-               self.cwnd as u32 / self.mss,
-               m.rtt as f64 / 1000.0);
-        return;
+
         if network_status.queue_length > 10 * self.mss as i32 {
             println!("Link get full utilized. Decrease cwnd");
             self.cwnd -= f64::from(network_status.queue_length) / 10.0;

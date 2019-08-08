@@ -397,7 +397,7 @@ impl<T: Ipc, A: GenericCongAvoidFlow> Flow<T, A> {
                 self.logger.as_ref().map(|log| {
                     warn!(log, "Cwnd update error";
                       "err" => ?e,
-                );
+                    );
                 });
             }
         }
