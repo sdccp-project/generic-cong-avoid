@@ -72,48 +72,49 @@ impl GenericCongAvoidFlow for Reno {
                    network_status: &NetworkStatus,
                    m: &GenericCongAvoidMeasurements)
     {
-        let fix_cwnd :Option<u32> = None;
-        if fix_cwnd.is_some() {
-            self.cwnd = fix_cwnd.unwrap() as f64 * self.mss as f64;
-            let mut queue_packets :i32 = -1;
-            if network_status.queue_length > 0 {
-                queue_packets = network_status.queue_length / self.mss as i32;
+        let queue_length = network_status.queue_length;
+        let network_utilization = network_status.link_utilization;
+
+        {
+            // The following codes are used to test how high can cwnd be
+            let fix_cwnd :Option<u32> = None;
+            if fix_cwnd.is_some() {
+                self.cwnd = fix_cwnd.unwrap() as f64 * self.mss as f64;
+                let mut queue_packets :i32 = -1;
+                if queue_length > 0 {
+                    queue_packets = queue_length / self.mss as i32;
+                }
+                write!(self.log_file.as_mut().unwrap(),
+                       "time: {:?}\tlink_utilization: {:.2}\tqueue: {}\tcwnd: {}\trtt: {}\n",
+                       SystemTime::now(),
+                       network_status.link_utilization,
+                       queue_packets,
+                       self.cwnd as u32 / self.mss,
+                       m.rtt as f64 / 1000.0);
+                return;
             }
-            write!(self.log_file.as_mut().unwrap(),
-                   "time: {:?}\tlink_utilization: {:.2}\tqueue: {}\tcwnd: {}\trtt: {}\n",
-                   SystemTime::now(),
-                   network_status.link_utilization,
-                   queue_packets,
-                   self.cwnd as u32 / self.mss,
-                   m.rtt as f64 / 1000.0);
-            return;
         }
 
-        if network_status.queue_length > 10 * self.mss as i32 {
-            println!("Link get full utilized. Decrease cwnd");
-            self.cwnd -= f64::from(network_status.queue_length) / 10.0;
-            if self.cwnd < f64::from(self.mss) {
-                self.cwnd = f64::from(self.mss);
+        let is_aggressive = network_utilization < 0.5;
+        if is_aggressive {
+            if network_status.link_utilization == self.last_utilization {
+                self.cwnd += f64::from(self.mss) * (f64::from(m.acked) / self.cwnd) * 2.0;
+            } else {
+                self.cwnd *= 3.0 / (2.0 * network_utilization as f64 + 1.0);
+                self.last_utilization = network_status.link_utilization;
+            }
+        }
+
+        if queue_length > 0 {
+            if network_status.link_utilization > 0.8 {
+                println!("Link get full utilized. Decrease cwnd");
+                self.cwnd -= f64::from(queue_length) / 10.0;
             }
         } else {
-            let is_aggressive = false;
-            if is_aggressive {
-                if network_status.link_utilization == self.last_utilization {
-                    self.cwnd += f64::from(self.mss) * (f64::from(m.acked) / self.cwnd);
-                } else {
-                    let mut link_uti = 1.0;
-                    if network_status.link_utilization < 1.0 {
-                        link_uti = network_status.link_utilization
-                    }
-
-                    self.cwnd *= 3.0 / (2.0 * link_uti as f64 + 1.0);
-                    self.last_utilization = network_status.link_utilization;
-                }
-            } else {
-                self.cwnd += 2.0 * f64::from(self.mss) * (f64::from(m.acked) / self.cwnd);
-            }
+            self.cwnd += f64::from(self.mss) * (f64::from(m.acked) / self.cwnd);
         }
 
+        // log
         let mut queue_packets :i32 = -1;
         if network_status.queue_length >= 0 {
             queue_packets = network_status.queue_length / self.mss as i32;
