@@ -69,7 +69,8 @@ pub trait RemoteGenericCongAvoidAlg {
         vec![]
     }
     fn with_args(matches: clap::ArgMatches) -> Self;
-    fn new_flow(&self, logger: Option<slog::Logger>, init_cwnd: u32, mss: u32) -> Self::Flow;
+    fn new_flow(&self, logger: Option<slog::Logger>, init_cwnd: u32, mss: u32,
+                sock_id: u32) -> Self::Flow;
 }
 
 pub struct Alg<A: RemoteGenericCongAvoidAlg> {
@@ -222,6 +223,7 @@ impl<T: Ipc, A: RemoteGenericCongAvoidAlg> CongAlg<T> for Alg<A> {
             info.init_cwnd
         };
 
+        let sock_id = control.get_sock_id();
         let mut s = Flow {
             control_channel: control,
             logger: self.logger.clone(),
@@ -236,7 +238,8 @@ impl<T: Ipc, A: RemoteGenericCongAvoidAlg> CongAlg<T> for Alg<A> {
             init_cwnd,
             curr_cwnd_reduction: 0,
             last_cwnd_reduction: time::now().to_timespec() - time::Duration::milliseconds(500),
-            alg: self.alg.new_flow(self.logger.clone(), init_cwnd, info.mss),
+            alg: self.alg.new_flow(self.logger.clone(), init_cwnd, info.mss,
+                                   sock_id),
 
             use_remote: true,
         };
@@ -285,6 +288,10 @@ pub struct Flow<T: Ipc, A: GenericCongAvoidFlow> {
 impl<I: Ipc, A: GenericCongAvoidFlow> portus::Flow for Flow<I, A> {
     fn on_report(&mut self, _sock_id: u32, m: Report) {
         let mut ms = self.get_fields(&m);
+
+        self.logger.as_ref().map(|log| {
+            debug!(log, "on report"; "sock_id" => _sock_id);
+        });
 
         if self.in_startup {
             // install new fold

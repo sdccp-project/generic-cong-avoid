@@ -7,8 +7,9 @@ use std::fs::File;
 use std::io::{Write, BufReader, BufRead};
 use std::time::SystemTime;
 
-pub const LOG_OUTPUT_FILE: &str = "log_output.txt";
-pub const REST_ADDR: &str = "http://127.0.0.1:8080/get_link_utilization";
+pub const LOG_OUTPUT_FILE: &str = "log_output";
+pub const TXT: &str = ".txt";
+pub const REST_ADDR: &str = "http://127.0.0.1:8080/get_user_link_utilization";
 
 use ::{RemoteGenericCongAvoidAlg, NetworkStatus};
 use GenericCongAvoidFlow;
@@ -22,6 +23,8 @@ pub struct Reno {
 
     last_utilization: f32,
     log_file: Option<File>,
+    sock_id: u32,
+    server_url: String,
 }
 
 impl RemoteGenericCongAvoidAlg for Reno {
@@ -35,14 +38,20 @@ impl RemoteGenericCongAvoidAlg for Reno {
         Default::default()
     }
 
-    fn new_flow(&self, _logger: Option<slog::Logger>, init_cwnd: u32, mss: u32) -> Self::Flow {
+    fn new_flow(&self, _logger: Option<slog::Logger>, init_cwnd: u32, mss: u32,
+                sock_id: u32) -> Self::Flow {
+        let mut log_file = LOG_OUTPUT_FILE.to_string();
+        log_file.push_str(&sock_id.to_string());
+        log_file.push_str(TXT);
         Reno {
             mss,
             init_cwnd: f64::from(init_cwnd),
             cwnd: f64::from(init_cwnd),
 
             last_utilization: 0.0,
-            log_file: File::create(LOG_OUTPUT_FILE).ok(),
+            log_file: File::create(&log_file).ok(),
+            sock_id,
+            server_url: format!("{}/{}", REST_ADDR, sock_id),
         }
     }
 }
@@ -129,9 +138,11 @@ impl GenericCongAvoidFlow for Reno {
     }
 
     fn update_network_status(&mut self) -> NetworkStatus {
-        let request_url = REST_ADDR;
-        let mut response = reqwest::get(request_url).unwrap();
+        let request_url = &self.server_url;
+        let mut response = reqwest::get(request_url)
+            .expect(&format!("Failed to get response from url ({:?})", request_url));
 
-        response.json().unwrap()
+        response.json()
+            .expect(&format!("Failed to parse the response {:?}", response))
     }
 }
