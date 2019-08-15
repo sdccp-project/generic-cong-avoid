@@ -129,7 +129,6 @@ impl GenericCongAvoidFlow for Reno {
             if network_status.link_utilization == self.last_utilization {
             } else {
                 self.cwnd *= 3.0 / (2.0 * network_utilization as f64 + 1.0);
-                self.last_utilization = network_utilization;
             }
         } else if network_utilization < 1.0 {
             self.cwnd += f64::from(self.mss) * (f64::from(m.acked) / self.cwnd);
@@ -141,8 +140,12 @@ impl GenericCongAvoidFlow for Reno {
             {
                 println!("Link get full utilized. Decrease cwnd");
                 self.cwnd -= f64::from(queue_length) / 3.0;
+                if self.cwnd <= 0.0 {
+                    self.cwnd = self.mss as f64;
+                }
             }
         }
+        self.last_utilization = network_utilization;
 
         // log
         let mut queue_packets :i32 = 0;
