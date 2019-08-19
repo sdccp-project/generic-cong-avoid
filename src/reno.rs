@@ -109,6 +109,7 @@ impl GenericCongAvoidFlow for Reno {
 
         if network_utilization == self.last_utilization {
             self.cwnd += f64::from(self.mss) * (f64::from(m.acked) / self.cwnd) * 1.0;
+
             // log
             let mut queue_packets :i32 = 0;
             if network_status.queue_length >= 0 {
