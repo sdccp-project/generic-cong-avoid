@@ -136,15 +136,16 @@ impl GenericCongAvoidFlow for Reno {
         }
 
         if network_utilization > 1.0 {
-            self.cwnd /= network_utilization as f64;
+            let alfa = 0.3;
+            self.cwnd = alfa * self.cwnd + (1.0 - alfa) * self.cwnd / network_utilization as f64;
         } else if (queue_length > 0) & (network_utilization > 0.9) {
-            {
-                println!("Link get full utilized. Decrease cwnd");
-                self.cwnd -= f64::from(queue_length) / 3.0;
-                if self.cwnd <= 0.0 {
-                    self.cwnd = self.mss as f64;
-                }
-            }
+//            {
+//                println!("Link get full utilized. Decrease cwnd");
+//                self.cwnd -= f64::from(queue_length) / 3.0;
+//                if self.cwnd <= 0.0 {
+//                    self.cwnd = self.mss as f64;
+//                }
+//            }
         }
         self.last_utilization = network_utilization;
 
